@@ -3,20 +3,75 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QRコード3×3グリッド転送システム - 制御QR付き</title>
-    <!-- QRコード生成ライブラリ -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <!-- 圧縮ライブラリ -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
-    <!-- QRコード読み取りライブラリ -->
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+    <title>QRコード3×3グリッド転送システム</title>
+    
+    <script>
+        // 環境判定
+        const ENV = {
+            isElectron: typeof window !== 'undefined' && window.process && window.process.type,
+            isGitHubPages: window.location.hostname.includes('github.io'),
+            isLocalFile: window.location.protocol === 'file:',
+            isWeb: window.location.protocol.startsWith('http')
+        };
+        
+        // 環境に応じたライブラリパスを設定
+        function getLibraryPath(filename) {
+            if (ENV.isElectron) {
+                // Electron: ローカルライブラリ
+                return `./libs/${filename}`;
+            } else {
+                // Web/GitHub: CDN
+                const cdnPaths = {
+                    'qrcode.min.js': 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
+                    'pako.min.js': 'https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js',
+                    'jsQR.js': 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js'
+                };
+                return cdnPaths[filename];
+            }
+        }
+        
+        // 動的にライブラリを読み込む
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+        
+        // ライブラリを順番に読み込む
+        async function loadLibraries() {
+            try {
+                await loadScript(getLibraryPath('qrcode.min.js'));
+                await loadScript(getLibraryPath('pako.min.js'));
+                await loadScript(getLibraryPath('jsQR.js'));
+                console.log('✅ すべてのライブラリを読み込みました');
+            } catch (error) {
+                console.error('❌ ライブラリの読み込みエラー:', error);
+                // Electron環境でローカルライブラリが見つからない場合はCDNにフォールバック
+                if (ENV.isElectron) {
+                    console.log('📡 CDNからライブラリを読み込みます...');
+                    ENV.isElectron = false; // 一時的にフラグを変更
+                    await loadLibraries();
+                    ENV.isElectron = true; // フラグを戻す
+                }
+            }
+        }
+        
+        // ページ読み込み時にライブラリを読み込む
+        window.addEventListener('DOMContentLoaded', loadLibraries);
+    </script>
+    
     <style>
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Yu Gothic UI', 'Meiryo', sans-serif;
             max-width: 1200px;
             margin: 0 auto;
             padding: 20px;
             background-color: #f5f5f7;
+            -webkit-font-smoothing: antialiased;
         }
         .container {
             background-color: white;
@@ -27,8 +82,24 @@
         h1 {
             color: #1d1d1f;
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 10px;
             font-size: 2rem;
+        }
+        .app-version {
+            text-align: center;
+            color: #86868b;
+            font-size: 0.9rem;
+            margin-bottom: 30px;
+        }
+        .env-indicator {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+            background-color: #e3f2fd;
+            color: #1976d2;
         }
         .mode-selector {
             display: flex;
@@ -77,54 +148,15 @@
             display: none;
         }
         
-        /* QRコードグリッドコンテナ */
-        #qrGridContainer {
+        /* QRグリッド表示 */
+        #qrGridDisplay {
             text-align: center;
             margin: 20px auto;
             max-width: 900px;
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 500px;
-            position: relative;
-        }
-        
-        /* 制御QRコード専用エリア */
-        .control-qr-area {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 150px;
-            height: 150px;
-            background-color: #007aff;
-            border-radius: 12px;
-            padding: 10px;
-            z-index: 10;
-            box-shadow: 0 4px 15px rgba(0,122,255,0.3);
-        }
-        
-        .control-qr-label {
-            color: white;
-            font-size: 12px;
-            font-weight: 600;
-            margin-bottom: 5px;
-            text-align: center;
-        }
-        
-        #controlQR {
-            background-color: white;
-            padding: 5px;
-            border-radius: 8px;
-        }
-        
-        /* データQRグリッド */
-        .data-qr-area {
-            background-color: #f5f5f7;
-            border-radius: 20px;
-            padding: 20px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-            width: 100%;
-            max-width: 900px;
+            min-height: 400px;
         }
         
         .qr-grid {
@@ -132,7 +164,12 @@
             grid-template-columns: repeat(3, 1fr);
             grid-template-rows: repeat(3, 1fr);
             gap: 15px;
+            padding: 20px;
+            background-color: #f5f5f7;
+            border-radius: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
             width: 100%;
+            max-width: 900px;
             aspect-ratio: 1 / 1;
         }
         
@@ -149,9 +186,14 @@
             aspect-ratio: 1 / 1;
         }
         
-        .qr-cell.empty {
-            background-color: #f5f5f7;
-            border-style: dashed;
+        .qr-cell.control {
+            background-color: #007aff;
+            border-color: #0051d5;
+        }
+        
+        .qr-cell.control .qr-cell-header {
+            background-color: white;
+            color: #007aff;
         }
         
         .qr-cell canvas {
@@ -194,31 +236,13 @@
             display: none;
         }
         
-        /* 監視エリア表示 */
-        #monitorOverlay {
+        #monitorArea {
             position: absolute;
-            top: 20px;
-            left: 20px;
-            width: 150px;
-            height: 150px;
+            top: 10px;
+            left: 10px;
             border: 3px solid #007aff;
-            border-radius: 12px;
+            background-color: rgba(0, 122, 255, 0.1);
             pointer-events: none;
-            z-index: 10;
-            display: none;
-        }
-        
-        #monitorOverlay::after {
-            content: '監視エリア';
-            position: absolute;
-            top: -25px;
-            left: 0;
-            color: #007aff;
-            font-size: 12px;
-            font-weight: 600;
-            background: white;
-            padding: 2px 8px;
-            border-radius: 4px;
         }
         
         .capture-indicator {
@@ -444,6 +468,49 @@
             margin-top: 0;
         }
         
+        /* Azure API設定 */
+        .azure-settings {
+            background-color: #fff4e6;
+            border: 1px solid #ffb74d;
+            padding: 20px;
+            border-radius: 12px;
+            margin: 20px 0;
+        }
+        
+        .azure-settings h3 {
+            color: #e65100;
+            margin-top: 0;
+        }
+        
+        .azure-status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+        
+        .azure-status.enabled {
+            background-color: #d1e7dd;
+            color: #0f5132;
+        }
+        
+        .azure-status.disabled {
+            background-color: #f8d7da;
+            color: #842029;
+        }
+        
+        .api-key-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #d1d1d6;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        
         /* モバイル対応 */
         @media (max-width: 768px) {
             .container {
@@ -455,13 +522,10 @@
             }
             .qr-grid {
                 gap: 10px;
+                padding: 15px;
             }
             .captured-images {
                 grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-            }
-            .control-qr-area {
-                width: 100px;
-                height: 100px;
             }
         }
     </style>
@@ -469,6 +533,10 @@
 <body>
     <div class="container">
         <h1>📱 QRコード3×3グリッド転送システム</h1>
+        <div class="app-version">
+            <span id="versionText">Universal Edition v1.0.0</span>
+            <span class="env-indicator" id="envIndicator">環境判定中...</span>
+        </div>
         
         <div class="mode-selector">
             <button class="mode-btn active" onclick="setMode('send')">📤 送信モード</button>
@@ -519,14 +587,8 @@
                 準備完了 - 送信開始を押してください
             </div>
 
-            <div id="qrGridContainer">
-                <div class="control-qr-area">
-                    <div class="control-qr-label">制御QR (ページ番号)</div>
-                    <div id="controlQR"></div>
-                </div>
-                <div class="data-qr-area">
-                    <div class="qr-grid" id="qrGrid"></div>
-                </div>
+            <div id="qrGridDisplay">
+                <div class="qr-grid" id="qrGrid"></div>
             </div>
 
             <div class="progress" style="display:none;">
@@ -543,17 +605,36 @@
         <div id="receiveSection" class="section">
             <h2>ファイル受信</h2>
             
+            <div class="azure-settings">
+                <h3>☁️ Azure API設定 <span class="azure-status disabled" id="azureStatus">無効</span></h3>
+                <div class="setting-item">
+                    <label>Azure Document Intelligence を使用:</label>
+                    <input type="checkbox" id="useAzureAPI" onchange="toggleAzureAPI()">
+                </div>
+                <div id="azureKeySection" style="display:none;">
+                    <p style="font-size: 14px; color: #666; margin: 10px 0;">
+                        APIキーを入力してください（ローカル保存されます）
+                    </p>
+                    <input type="password" class="api-key-input" id="azureApiKey" placeholder="Azure APIキー">
+                    <input type="text" class="api-key-input" id="azureEndpoint" placeholder="エンドポイントURL (オプション)" style="margin-top: 5px;">
+                    <button class="control-btn" onclick="saveAzureSettings()" style="margin-top: 10px; padding: 10px 20px; font-size: 14px;">保存</button>
+                </div>
+                <p style="font-size: 14px; color: #666; margin: 10px 0;">
+                    ※ 無効の場合は制御QRのみ読み取り可能（ファイル転送不可）
+                </p>
+            </div>
+            
             <div class="auto-capture-settings">
                 <h3>📸 自動撮影設定</h3>
                 <div class="setting-item">
                     <label>QR変化検知後の待機時間 (ミリ秒):</label>
-                    <input type="number" id="captureDelay" value="200" min="100" max="1000" step="100">
+                    <input type="number" id="captureDelay" value="300" min="100" max="1000" step="100">
                 </div>
             </div>
             
             <div class="info">
                 <p>📹 カメラで送信側の画面を映してください</p>
-                <p>🎯 左上の青い制御QRコードを監視して自動撮影します</p>
+                <p>🎯 左上の制御QRコードが変わると自動的に撮影します</p>
                 <p>✋ すべてのページを撮影したら「撮影停止」を押してください</p>
             </div>
 
@@ -579,7 +660,7 @@
             <div id="videoContainer" style="display:none;">
                 <video id="video" autoplay playsinline></video>
                 <canvas id="captureCanvas"></canvas>
-                <div id="monitorOverlay"></div>
+                <div id="monitorArea"></div>
                 <div class="capture-indicator" id="captureIndicator" style="display:none;">
                     🔴 REC
                 </div>
@@ -628,13 +709,95 @@
         let expectedTotalPages = 0;
         
         // Azure設定
-        const AZURE_ENDPOINT = 'https://azure-document-intelligence-2.cognitiveservices.azure.com/';
-        const AZURE_KEY = '7jg4O09qKLNJjCp7MKoXgR7PuEYR8j9yF9AM1VAhAiMXiHLwhkXhJQQJ99BFACYeBjFXJ3w3AAALACOG9ljp';
+        let useAzureAPI = false;
+        let azureConfig = {
+            endpoint: '',
+            key: ''
+        };
         
         // 初期化
         window.addEventListener('DOMContentLoaded', () => {
             initQRGrid();
+            updateEnvironmentDisplay();
+            loadSettings();
         });
+
+        // 環境表示を更新
+        function updateEnvironmentDisplay() {
+            const indicator = document.getElementById('envIndicator');
+            if (ENV.isElectron) {
+                indicator.textContent = 'Electron App';
+                indicator.style.backgroundColor = '#e8f5e9';
+                indicator.style.color = '#2e7d32';
+            } else if (ENV.isGitHubPages) {
+                indicator.textContent = 'GitHub Pages';
+                indicator.style.backgroundColor = '#f3e5f5';
+                indicator.style.color = '#6a1b9a';
+            } else if (ENV.isLocalFile) {
+                indicator.textContent = 'ローカルファイル';
+                indicator.style.backgroundColor = '#fff3e0';
+                indicator.style.color = '#e65100';
+            } else {
+                indicator.textContent = 'Web';
+                indicator.style.backgroundColor = '#e3f2fd';
+                indicator.style.color = '#1976d2';
+            }
+        }
+
+        // 設定の読み込み
+        function loadSettings() {
+            // ローカルストレージから設定を読み込む
+            const savedUseAzure = localStorage.getItem('useAzureAPI');
+            const savedAzureKey = localStorage.getItem('azureApiKey');
+            const savedAzureEndpoint = localStorage.getItem('azureEndpoint');
+            
+            if (savedUseAzure === 'true') {
+                document.getElementById('useAzureAPI').checked = true;
+                toggleAzureAPI();
+            }
+            
+            if (savedAzureKey) {
+                document.getElementById('azureApiKey').value = savedAzureKey;
+                azureConfig.key = savedAzureKey;
+            }
+            
+            if (savedAzureEndpoint) {
+                document.getElementById('azureEndpoint').value = savedAzureEndpoint;
+                azureConfig.endpoint = savedAzureEndpoint;
+            } else {
+                // デフォルトエンドポイント
+                azureConfig.endpoint = 'https://azure-document-intelligence-2.cognitiveservices.azure.com/';
+            }
+        }
+
+        // Azure API設定の切り替え
+        function toggleAzureAPI() {
+            useAzureAPI = document.getElementById('useAzureAPI').checked;
+            document.getElementById('azureKeySection').style.display = useAzureAPI ? 'block' : 'none';
+            document.getElementById('azureStatus').textContent = useAzureAPI ? '有効' : '無効';
+            document.getElementById('azureStatus').className = useAzureAPI ? 'azure-status enabled' : 'azure-status disabled';
+            localStorage.setItem('useAzureAPI', useAzureAPI);
+        }
+
+        // Azure設定を保存
+        function saveAzureSettings() {
+            const apiKey = document.getElementById('azureApiKey').value;
+            const endpoint = document.getElementById('azureEndpoint').value || 'https://azure-document-intelligence-2.cognitiveservices.azure.com/';
+            
+            if (!apiKey) {
+                alert('APIキーを入力してください');
+                return;
+            }
+            
+            azureConfig.key = apiKey;
+            azureConfig.endpoint = endpoint;
+            
+            // ローカルストレージに保存
+            localStorage.setItem('azureApiKey', apiKey);
+            localStorage.setItem('azureEndpoint', endpoint);
+            
+            alert('Azure設定を保存しました');
+        }
 
         // モード切替
         function setMode(mode) {
@@ -660,6 +823,9 @@
             for (let i = 0; i < 9; i++) {
                 const cell = document.createElement('div');
                 cell.className = 'qr-cell';
+                if (i === 0) {
+                    cell.className += ' control';
+                }
                 cell.id = `qr-cell-${i}`;
                 grid.appendChild(cell);
             }
@@ -703,7 +869,7 @@
                     chunks.push(fileData.data.substr(i, chunkSize));
                 }
                 
-                // 9個のデータQRで計算（左上は制御用なので8個）
+                // 8個のデータQRで計算（左上は制御用）
                 const totalPages = Math.ceil(chunks.length / 8);
                 
                 document.getElementById('chunkCount').textContent = chunks.length;
@@ -741,39 +907,7 @@
         // 初期ページ表示
         function displayInitialPage() {
             const totalPages = Math.ceil(chunks.length / 8);
-            
-            // 制御QRコード（ページ0）
-            displayControlQR(0, totalPages);
-            
-            // データグリッドをクリア
-            for (let i = 0; i < 9; i++) {
-                const cell = document.getElementById(`qr-cell-${i}`);
-                cell.innerHTML = '';
-                cell.className = 'qr-cell empty';
-            }
-        }
-
-        // 制御QRコード表示
-        function displayControlQR(pageNumber, totalPages) {
-            const controlData = JSON.stringify({
-                type: 'control',
-                page: pageNumber,
-                total: totalPages,
-                fileName: fileData ? fileData.name : '',
-                timestamp: Date.now()
-            });
-            
-            console.log('制御QR生成:', controlData);
-            
-            const container = document.getElementById('controlQR');
-            container.innerHTML = '';
-            
-            new QRCode(container, {
-                text: controlData,
-                width: 120,
-                height: 120,
-                correctLevel: QRCode.CorrectLevel.L
-            });
+            displayPage(0);
         }
 
         // 送信開始
@@ -824,44 +958,66 @@
             document.getElementById('currentPage').textContent = pageIndex + 1;
             document.getElementById('totalPagesDisplay').textContent = totalPages;
             
-            // 制御QRコード更新
-            displayControlQR(pageIndex, totalPages);
-            
-            // データQRコード表示（8個）
-            const startChunkIndex = pageIndex * 8;
-            
+            // 9個のセルを更新
             for (let i = 0; i < 9; i++) {
                 const cell = document.getElementById(`qr-cell-${i}`);
                 cell.innerHTML = '';
                 
-                const chunkIndex = startChunkIndex + i;
-                
-                if (chunkIndex < chunks.length) {
-                    cell.className = 'qr-cell';
-                    
+                if (i === 0) {
+                    // 左上: 制御QRコード
                     const header = document.createElement('div');
                     header.className = 'qr-cell-header';
-                    header.textContent = `#${chunkIndex + 1}`;
+                    header.textContent = '制御QR (ページ番号)';
                     cell.appendChild(header);
                     
                     const qrDiv = document.createElement('div');
                     cell.appendChild(qrDiv);
                     
-                    const chunkData = JSON.stringify({
-                        type: 'chunk',
-                        chunkIndex: chunkIndex,
+                    const controlData = JSON.stringify({
+                        type: 'control',
+                        page: pageIndex,
+                        totalPages: totalPages,
+                        fileName: fileData.name,
+                        fileType: fileData.type,
+                        compressed: fileData.compressed,
                         totalChunks: chunks.length,
-                        data: chunks[chunkIndex]
+                        timestamp: Date.now()
                     });
                     
+                    console.log('制御QR:', controlData);
+                    
                     new QRCode(qrDiv, {
-                        text: chunkData,
+                        text: controlData,
                         width: 200,
                         height: 200,
-                        correctLevel: QRCode.CorrectLevel.M
+                        correctLevel: QRCode.CorrectLevel.L
                     });
                 } else {
-                    cell.className = 'qr-cell empty';
+                    // 残り8マス: データQRコード
+                    const chunkIndex = pageIndex * 8 + (i - 1);
+                    
+                    if (chunkIndex < chunks.length) {
+                        const header = document.createElement('div');
+                        header.className = 'qr-cell-header';
+                        header.textContent = `#${chunkIndex + 1}`;
+                        cell.appendChild(header);
+                        
+                        const qrDiv = document.createElement('div');
+                        cell.appendChild(qrDiv);
+                        
+                        const chunkData = JSON.stringify({
+                            type: 'chunk',
+                            chunkIndex: chunkIndex,
+                            data: chunks[chunkIndex]
+                        });
+                        
+                        new QRCode(qrDiv, {
+                            text: chunkData,
+                            width: 200,
+                            height: 200,
+                            correctLevel: QRCode.CorrectLevel.M
+                        });
+                    }
                 }
             }
             
@@ -908,9 +1064,15 @@
                     document.getElementById('captureIndicator').style.display = 'block';
                     document.getElementById('captureIndicator').textContent = '👀 監視中';
                     document.getElementById('captureStatus').textContent = '👀 左上の制御QRコードを監視中...';
-                    document.getElementById('monitorOverlay').style.display = 'block';
                     
-                    console.log('制御QRコード監視を開始します');
+                    // 監視エリアを表示
+                    const monitorArea = document.getElementById('monitorArea');
+                    const cellSize = Math.min(video.videoWidth, video.videoHeight) / 3;
+                    monitorArea.style.width = cellSize + 'px';
+                    monitorArea.style.height = cellSize + 'px';
+                    monitorArea.style.display = 'block';
+                    
+                    console.log('監視開始');
                     requestAnimationFrame(monitorControlQR);
                 };
                 
@@ -932,14 +1094,13 @@
             
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             
-            // 制御QRコードエリア（左上の固定位置）
-            const controlAreaSize = 150;
-            const margin = 20;
+            // 左上のセル（全体の1/3サイズ）
+            const cellSize = Math.min(canvas.width, canvas.height) / 3;
             
             try {
-                const imageData = ctx.getImageData(margin, margin, controlAreaSize, controlAreaSize);
+                const imageData = ctx.getImageData(0, 0, cellSize, cellSize);
                 
-                const code = jsQR(imageData.data, controlAreaSize, controlAreaSize, {
+                const code = jsQR(imageData.data, cellSize, cellSize, {
                     inversionAttempts: "dontInvert"
                 });
                 
@@ -948,20 +1109,18 @@
                         const qrData = JSON.parse(code.data);
                         
                         if (qrData.type === 'control') {
-                            const currentPage = qrData.page;
-                            
-                            if (qrData.total && expectedTotalPages === 0) {
-                                expectedTotalPages = qrData.total;
+                            if (qrData.totalPages && expectedTotalPages === 0) {
+                                expectedTotalPages = qrData.totalPages;
                                 document.getElementById('expectedPages').textContent = expectedTotalPages;
                                 updatePageStatusDisplay();
                                 console.log(`総ページ数: ${expectedTotalPages}`);
                             }
                             
-                            if (currentPage !== lastPageNumber) {
-                                console.log(`ページ変化検知: ${lastPageNumber} → ${currentPage}`);
-                                lastPageNumber = currentPage;
+                            if (qrData.page !== lastPageNumber) {
+                                console.log(`ページ変化検知: ${lastPageNumber} → ${qrData.page}`);
+                                lastPageNumber = qrData.page;
                                 
-                                if (!capturedPages.has(currentPage)) {
+                                if (!capturedPages.has(qrData.page)) {
                                     document.getElementById('captureIndicator').textContent = '⏳ 準備中';
                                     document.getElementById('captureIndicator').style.backgroundColor = '#ffc107';
                                     
@@ -969,18 +1128,11 @@
                                     
                                     setTimeout(() => {
                                         if (isMonitoring) {
-                                            captureImage(currentPage);
-                                            document.getElementById('captureStatus').textContent = 
-                                                `📸 ページ ${currentPage + 1} を撮影！（${capturedPages.size}/${expectedTotalPages}ページ）`;
-                                            
-                                            if (expectedTotalPages > 0 && capturedPages.size >= expectedTotalPages) {
-                                                document.getElementById('captureStatus').textContent = 
-                                                    '✅ 全ページの撮影が完了しました！';
-                                                document.getElementById('captureStatus').className = 'status-message status-success';
-                                                stopAutoCapture();
-                                            }
+                                            captureImage(qrData.page);
                                         }
                                     }, delay);
+                                } else {
+                                    console.log(`ページ ${qrData.page} は既に撮影済み`);
                                 }
                             }
                         }
@@ -1017,6 +1169,17 @@
                 updatePageStatusDisplay();
                 document.getElementById('capturedCount').textContent = capturedImages.length;
                 document.getElementById('capturedPagesDisplay').textContent = capturedPages.size;
+                
+                document.getElementById('captureStatus').textContent = 
+                    `📸 ページ ${pageNumber + 1} を撮影！（${capturedPages.size}/${expectedTotalPages}ページ）`;
+                
+                // 全ページ撮影完了チェック
+                if (expectedTotalPages > 0 && capturedPages.size >= expectedTotalPages) {
+                    document.getElementById('captureStatus').textContent = 
+                        '✅ 全ページの撮影が完了しました！';
+                    document.getElementById('captureStatus').className = 'status-message status-success';
+                    stopAutoCapture();
+                }
                 
                 const indicator = document.getElementById('captureIndicator');
                 indicator.textContent = '📸 撮影！';
@@ -1063,7 +1226,7 @@
             document.getElementById('video').srcObject = null;
             document.getElementById('videoContainer').style.display = 'none';
             document.getElementById('captureIndicator').style.display = 'none';
-            document.getElementById('monitorOverlay').style.display = 'none';
+            document.getElementById('monitorArea').style.display = 'none';
             document.querySelector('#receiveSection .start-btn').style.display = 'inline-block';
             document.querySelector('#receiveSection .stop-btn').style.display = 'none';
             
@@ -1147,6 +1310,18 @@
                 return;
             }
             
+            if (!useAzureAPI) {
+                alert('Azure APIが無効です。\n制御QRコードの情報のみ取得できますが、ファイル転送はできません。');
+                document.getElementById('processBtn').disabled = false;
+                return;
+            }
+            
+            if (!azureConfig.key) {
+                alert('Azure APIキーが設定されていません。\n受信モードのAzure API設定からAPIキーを入力してください。');
+                document.getElementById('processBtn').disabled = false;
+                return;
+            }
+            
             document.getElementById('processBtn').disabled = true;
             document.getElementById('captureStatus').textContent = '🔄 画像を解析中...';
             document.getElementById('captureStatus').className = 'status-message status-processing';
@@ -1194,14 +1369,14 @@
 
         // Azure Document Intelligence API呼び出し
         async function analyzeImageWithAzure(imageBlob) {
-            const analyzeUrl = `${AZURE_ENDPOINT}documentintelligence/documentModels/prebuilt-read:analyze?api-version=2024-11-30&features=barcodes`;
+            const analyzeUrl = `${azureConfig.endpoint}documentintelligence/documentModels/prebuilt-read:analyze?api-version=2024-11-30&features=barcodes`;
             
             const arrayBuffer = await imageBlob.arrayBuffer();
             
             const response = await fetch(analyzeUrl, {
                 method: 'POST',
                 headers: {
-                    'Ocp-Apim-Subscription-Key': AZURE_KEY,
+                    'Ocp-Apim-Subscription-Key': azureConfig.key,
                     'Content-Type': 'application/octet-stream'
                 },
                 body: arrayBuffer
@@ -1227,7 +1402,7 @@
             for (let i = 0; i < maxAttempts; i++) {
                 const response = await fetch(operationUrl, {
                     headers: {
-                        'Ocp-Apim-Subscription-Key': AZURE_KEY
+                        'Ocp-Apim-Subscription-Key': azureConfig.key
                     }
                 });
                 
@@ -1259,21 +1434,25 @@
                         try {
                             const data = JSON.parse(barcode.value);
                             
-                            if (data.type === 'chunk') {
-                                if (!receivedFileInfo && data.totalChunks) {
+                            if (data.type === 'control') {
+                                // 制御QRからファイル情報を取得
+                                if (!receivedFileInfo) {
                                     receivedFileInfo = {
-                                        totalChunks: data.totalChunks
+                                        fileName: data.fileName,
+                                        fileType: data.fileType,
+                                        compressed: data.compressed
                                     };
                                     totalChunksCount = data.totalChunks;
+                                    
+                                    document.getElementById('receivedFileName').textContent = data.fileName;
                                     document.getElementById('totalChunks').textContent = totalChunksCount;
                                 }
-                                
+                            } else if (data.type === 'chunk') {
+                                // データチャンクを保存
                                 if (!receivedChunksData.hasOwnProperty(data.chunkIndex)) {
                                     receivedChunksData[data.chunkIndex] = data.data;
                                     document.getElementById('receivedChunks').textContent = Object.keys(receivedChunksData).length;
                                 }
-                            } else if (data.type === 'control' && data.fileName) {
-                                document.getElementById('receivedFileName').textContent = data.fileName;
                             }
                         } catch (e) {
                             // JSON解析エラーは無視
@@ -1291,26 +1470,31 @@
             }
             
             try {
+                // チャンクを結合
                 let completeData = '';
                 for (let i = 0; i < totalChunksCount; i++) {
                     completeData += receivedChunksData[i];
                 }
                 
+                // Base64デコード
                 const binaryString = atob(completeData);
                 const bytes = new Uint8Array(binaryString.length);
                 for (let i = 0; i < binaryString.length; i++) {
                     bytes[i] = binaryString.charCodeAt(i);
                 }
                 
-                // 注: ファイル名と圧縮情報は制御QRから取得する必要があります
+                // 圧縮解除
                 let finalData = bytes;
-                // ここで圧縮解除が必要な場合は実装
+                if (receivedFileInfo.compressed) {
+                    finalData = pako.inflate(bytes);
+                }
                 
-                const blob = new Blob([finalData]);
+                // ダウンロード
+                const blob = new Blob([finalData], { type: receivedFileInfo.fileType });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = document.getElementById('receivedFileName').textContent || 'download.bin';
+                a.download = receivedFileInfo.fileName;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);

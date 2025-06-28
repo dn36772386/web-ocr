@@ -1,0 +1,26 @@
+@echo off
+echo QRコード転送システムのセットアップを開始します...
+
+REM ライブラリディレクトリを作成
+if not exist libs mkdir libs
+
+REM QRコード生成ライブラリをダウンロード
+echo [1/3] qrcode.min.js をダウンロード中...
+powershell -Command "Invoke-WebRequest -Uri 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js' -OutFile 'libs/qrcode.min.js'"
+
+REM 圧縮ライブラリをダウンロード
+echo [2/3] pako.min.js をダウンロード中...
+powershell -Command "Invoke-WebRequest -Uri 'https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js' -OutFile 'libs/pako.min.js'"
+
+REM QRコード読み取りライブラリをダウンロード
+echo [3/3] jsQR.js をダウンロード中...
+powershell -Command "Invoke-WebRequest -Uri 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js' -OutFile 'libs/jsQR.js'"
+
+echo.
+echo ライブラリのダウンロードが完了しました！
+echo.
+echo 次のステップ:
+echo 1. npm install を実行してElectronをインストール
+echo 2. npm start でアプリを起動
+echo.
+pause
